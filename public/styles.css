@@ -1,0 +1,101 @@
+body {
+  background-color: #000;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+.container {
+  text-align: center;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: rgb(94, 255, 0);
+  text-shadow: 0 0 10px rgb(94, 255, 0), 0 0 20px rgb(94, 255, 0), 0 0 30px rgb(94, 255, 0);
+}
+
+.game-board {
+  display: grid;
+  grid-template-columns: repeat(3, 100px);
+  gap: 10px;
+  margin: 20px auto;
+}
+
+.cell {
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #ff00ff;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: color 0.3s, background-color 0.3s;
+  border: 2px solid rgb(94, 255, 0);
+}
+
+.cell:hover {
+  background-color: rgba(94, 255, 0, 0.3);
+}
+
+.cell.x {
+  color: #0ff;
+  text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 30px #0ff;
+}
+
+.cell.o {
+  color: #f0f;
+  text-shadow: 0 0 10px #f0f, 0 0 20px #f0f;
+}
+
+.cell.to-remove {
+  opacity: 0.75;
+  animation: fade 1s ease-in-out infinite alternate;
+}
+
+@keyframes fade {
+  from {
+      opacity: 0.5;
+  }
+  to {
+      opacity: 0.2;
+  }
+}
+
+button {
+  background-color: #222;
+  color: rgb(94, 255, 0);
+  border: 1px solid rgb(94, 255, 0);
+  padding: 10px 20px;
+  margin: 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 1rem;
+  box-shadow: 0 0 5px rgb(94, 255, 0), 0 0 10px rgb(94, 255, 0);
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+button:hover {
+  background-color: #333;
+  box-shadow: 0 0 10px rgb(94, 255, 0), 0 0 20px rgb(94, 255, 0);
+}
+
+.winner {
+  background-color: rgba(0, 255, 0, 0.5); /* Color verde claro */
+}
+
+.onlineMenu {
+  display: none;
+  text-align: center;
+}
+
+
+
+

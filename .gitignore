@@ -1,0 +1,9 @@
+# Ignorar la carpeta de dependencias de Node.js
+node_modules/
+
+# Ignorar archivos de entorno para credenciales u otras configuraciones sensibles
+.env
+
+# Ignorar archivos de log
+*.log
+logs/
