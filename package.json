@@ -1,16 +1,16 @@
 {
-  "name": "tic-tac-toe",
+  "name": "tic-tac-toe-online",
   "version": "1.0.0",
-  "description": "",
-  "main": "app.js",
+  "description": "Tic Tac Toe con modo online y diferentes niveles de dificultad",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.21.1",
-    "socket.io": "^4.8.1"
+    "express": "^4.18.2",
+    "ws": "^8.13.0"
   }
 }

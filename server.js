@@ -1,28 +1,22 @@
+// server.js
 const express = require('express');
 const http = require('http');
-const socketIO = require('socket.io');
+const WebSocket = require('ws');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIO(server);
+const wss = new WebSocket.Server({ server });
 
-app.use(express.static('public')); // Sirve la carpeta 'public' como archivos estáticos
+// Servir archivos estáticos desde la carpeta public
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Resto de la configuración del servidor (lógica de sockets, etc.)
+const games = new Map();
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
-});
+function generateGameId() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
 
-// server.js
-const WebSocket = require('ws');
-const wss = new WebSocket.Server({ port: 8080 });
-
-// Almacenar partidas
-const games = {};
-
-// Escuchar conexiones
 wss.on('connection', (ws) => {
     ws.on('message', (message) => {
         const data = JSON.parse(message);
@@ -30,37 +24,77 @@ wss.on('connection', (ws) => {
         switch (data.type) {
             case 'create':
                 const gameId = generateGameId();
-                games[gameId] = { players: [ws], board: Array(9).fill(null) };
+                games.set(gameId, {
+                    creator: ws,
+                    opponent: null,
+                    board: Array(9).fill(null)
+                });
+                ws.gameId = gameId;
                 ws.send(JSON.stringify({ type: 'gameCreated', gameId }));
                 break;
 
             case 'join':
-                const game = games[data.gameId];
-                if (game && game.players.length === 1) {
-                    game.players.push(ws);
-                    game.players.forEach((player, index) =>
-                        player.send(JSON.stringify({ type: 'startGame', player: index === 0 ? 'X' : 'O' }))
-                    );
+                const game = games.get(data.gameId);
+                if (game && !game.opponent) {
+                    game.opponent = ws;
+                    ws.gameId = data.gameId;
+                    
+                    // Notificar a ambos jugadores
+                    game.creator.send(JSON.stringify({ type: 'startGame', player: 'X' }));
+                    game.opponent.send(JSON.stringify({ type: 'startGame', player: 'O' }));
                 } else {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Game not found or already full.' }));
+                    ws.send(JSON.stringify({ 
+                        type: 'error', 
+                        message: 'Partida no encontrada o llena' 
+                    }));
                 }
                 break;
 
             case 'move':
-                const currentGame = games[data.gameId];
-                if (currentGame) {
+                const currentGame = games.get(data.gameId);
+                if (currentGame && currentGame.board[data.index] === null) {
                     currentGame.board[data.index] = data.player;
-                    currentGame.players.forEach((player) =>
-                        player.send(JSON.stringify({ type: 'move', index: data.index, player: data.player }))
-                    );
+                    
+                    // Enviar el movimiento a ambos jugadores
+                    currentGame.creator.send(JSON.stringify({
+                        type: 'move',
+                        index: data.index,
+                        player: data.player
+                    }));
+                    currentGame.opponent.send(JSON.stringify({
+                        type: 'move',
+                        index: data.index,
+                        player: data.player
+                    }));
                 }
                 break;
         }
     });
+
+    ws.on('close', () => {
+        if (ws.gameId) {
+            const game = games.get(ws.gameId);
+            if (game) {
+                if (game.creator === ws) {
+                    if (game.opponent) {
+                        game.opponent.send(JSON.stringify({ 
+                            type: 'opponentLeft',
+                            message: 'Tu oponente ha abandonado la partida'
+                        }));
+                    }
+                } else if (game.opponent === ws) {
+                    game.creator.send(JSON.stringify({ 
+                        type: 'opponentLeft',
+                        message: 'Tu oponente ha abandonado la partida'
+                    }));
+                }
+                games.delete(ws.gameId);
+            }
+        }
+    });
 });
 
-function generateGameId() {
-    return Math.random().toString(36).substr(2, 6).toUpperCase();
-}
-
-console.log("WebSocket server is running on ws://localhost:8080");
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+    console.log(`Servidor iniciado en el puerto ${PORT}`);
+});
