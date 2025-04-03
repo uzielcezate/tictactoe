@@ -13,122 +13,115 @@ const winnerMessage = document.getElementById("winnerMessage");
 
 
 function startOnlineGame(action) {
-    socket = new WebSocket("ws://localhost:8080");
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}`;
+        socket = new WebSocket(wsUrl);
 
-    socket.onopen = () => {
-        if (action === 'create') {
-            socket.send(JSON.stringify({ type: 'create' }));
-        }
-    };
+        socket.onopen = () => {
+            if (action === 'create') {
+                socket.send(JSON.stringify({ type: 'create' }));
+            }
+        };
 
-    socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
 
-        switch (data.type) {
-            case 'gameCreated':
-                gameId = data.gameId;
-                alert(`Partida creada. Código de la partida: ${gameId}`);
-                break;
+            switch (data.type) {
+                case 'gameCreated':
+                    gameId = data.gameId;
+                    showGameCode(gameId);
+                    break;
 
-            case 'startGame':
-                currentPlayer = data.player;
-                alert(`Juego iniciado. Tú eres ${currentPlayer}`);
-                resetGame();
-                break;
+                case 'startGame':
+                    currentPlayer = data.player;
+                    showPlayerInfo(currentPlayer);
+                    resetGame();
+                    break;
 
-            case 'move':
-                board[data.index] = data.player;
-                renderBoard();
-                break;
+                case 'move':
+                    board[data.index] = data.player;
+                    renderBoard();
+                    const winningPattern = checkWin();
+                    if (winningPattern) {
+                        displayWinner(data.player);
+                        renderBoard(winningPattern);
+                    }
+                    currentPlayer = currentPlayer === "X" ? "O" : "X";
+                    break;
 
-            case 'error':
-                alert(data.message);
-                break;
-        }
-    };
+                case 'error':
+                    showError(data.message);
+                    break;
+
+                case 'opponentLeft':
+                    showError("Tu oponente ha abandonado la partida");
+                    returnToMenu();
+                    break;
+            }
+        };
+
+        socket.onclose = () => {
+            showError("Conexión perdida. Volviendo al menú principal...");
+            setTimeout(returnToMenu, 2000);
+        };
+
+        socket.onerror = () => {
+            showError("Error de conexión. Volviendo al menú principal...");
+            setTimeout(returnToMenu, 2000);
+        };
+    }
+}
+
+function showGameCode(code) {
+    const codeDisplay = document.createElement('div');
+    codeDisplay.className = 'game-code';
+    codeDisplay.innerHTML = `
+        <h3>Código de la partida:</h3>
+        <div class="code">${code}</div>
+        <p>Comparte este código con tu oponente</p>
+        <div class="loading">Esperando oponente...</div>
+    `;
+    document.getElementById('game').appendChild(codeDisplay);
+}
+
+function showPlayerInfo(player) {
+    const playerInfo = document.createElement('div');
+    playerInfo.className = 'player-info';
+    playerInfo.innerHTML = `<h3>Tu símbolo: ${player}</h3>`;
+    document.getElementById('game').appendChild(playerInfo);
+}
+
+function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.textContent = message;
+    document.body.appendChild(errorDiv);
+    setTimeout(() => errorDiv.remove(), 3000);
 }
 
 function joinGame() {
     const code = prompt("Introduce el código de la partida:");
     if (code) {
-        socket = new WebSocket("ws://localhost:8080");
-        socket.onopen = () => {
-            socket.send(JSON.stringify({ type: 'join', gameId: code }));
-        };
-    }
-}
-
-function handleClick(index) {
-    if (gameMode === "online" && currentPlayer === "X") {
-        if (!board[index]) {
-            board[index] = currentPlayer;
-            socket.send(JSON.stringify({ type: 'move', gameId, index, player: currentPlayer }));
-            currentPlayer = "O";
-            renderBoard();
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
+            socket = new WebSocket(wsUrl);
+            socket.onopen = () => {
+                socket.send(JSON.stringify({ type: 'join', gameId: code }));
+            };
         }
     }
-}
-
-
-function startGame(mode) {
-    gameMode = mode;
-    document.getElementById("menu").style.display = "none";
-    if (mode === "bot") {
-        document.getElementById("difficultyMenu").style.display = "block";
-    } else {
-        document.getElementById("game").style.display = "block";
-        resetGame();
-    }
-}
-
-function setDifficulty(level) {
-    difficulty = level;
-    document.getElementById("difficultyMenu").style.display = "none";
-    document.getElementById("game").style.display = "block";
-    resetGame();
-}
-
-function returnToMenu() {
-    document.getElementById("game").style.display = "none";
-    document.getElementById("difficultyMenu").style.display = "none";
-    document.getElementById("menu").style.display = "block";
-}
-
-function renderBoard(winningPattern = []) {
-    gameBoard.innerHTML = "";
-    board.forEach((cell, index) => {
-        const cellElement = document.createElement("div");
-        cellElement.classList.add("cell");
-
-        if (cell === "X") {
-            cellElement.classList.add("x");
-            cellElement.textContent = "X";
-        } else if (cell === "O") {
-            cellElement.classList.add("o");
-            cellElement.textContent = "O";
-        }
-
-        // Añadir la clase de parpadeo a la figura "X" que se va a eliminar
-        if (currentPlayer === "X" && movesX[0] === index) {
-            cellElement.classList.add("to-remove");
-        } else if (currentPlayer === "O" && movesO[0] === index) {
-            cellElement.classList.add("to-remove");
-        }
-
-        // Resaltar las celdas de la línea ganadora
-        if (winningPattern.includes(index)) {
-            cellElement.classList.add("winner");
-        }
-
-        cellElement.addEventListener("click", () => handleClick(index));
-        gameBoard.appendChild(cellElement);
-    });
 }
 
 function handleClick(index) {
     if (board[index] || checkWin()) return;
 
-    if (gameMode === "local") {
+    if (gameMode === "online") {
+        if (currentPlayer === "X" && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'move', gameId, index, player: currentPlayer }));
+        }
+    } else if (gameMode === "local") {
         if (currentPlayer === "X") {
             if (movesX.length === maxMoves) {
                 board[movesX.shift()] = null; // Eliminar la figura "X" más antigua
@@ -208,26 +201,66 @@ function getRandomMove() {
 }
 
 function findBestMove(player) {
-    const opponent = player === "O" ? "X" : "O";
-    const winPatterns = [
-        [0, 1, 2], [3, 4, 5], [6, 7, 8],
-        [0, 3, 6], [1, 4, 7], [2, 5, 8],
-        [0, 4, 8], [2, 4, 6]
-    ];
-
-    for (const pattern of winPatterns) {
-        let countPlayer = 0;
-        let emptyIndex = -1;
-
-        for (const index of pattern) {
-            if (board[index] === player) countPlayer++;
-            else if (!board[index]) emptyIndex = index;
-        }
-
-        if (countPlayer === 2 && emptyIndex !== -1) return emptyIndex;
+    if (difficulty === "hard") {
+        return findBestMoveMinimax(player);
+    } else if (difficulty === "medium") {
+        // 80% de probabilidad de hacer un movimiento inteligente
+        return Math.random() < 0.8 ? findBestMoveMinimax(player) : getRandomMove();
     }
+    return getRandomMove();
+}
 
-    return -1;
+function findBestMoveMinimax(player) {
+    let bestScore = -Infinity;
+    let bestMove = -1;
+    
+    for (let i = 0; i < 9; i++) {
+        if (!board[i]) {
+            board[i] = player;
+            let score = minimax(board, 0, false, player);
+            board[i] = null;
+            
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = i;
+            }
+        }
+    }
+    
+    return bestMove;
+}
+
+function minimax(board, depth, isMaximizing, player) {
+    const opponent = player === "X" ? "O" : "X";
+    const result = checkWin();
+    
+    if (result) {
+        return isMaximizing ? 10 - depth : depth - 10;
+    }
+    
+    if (isMaximizing) {
+        let bestScore = -Infinity;
+        for (let i = 0; i < 9; i++) {
+            if (!board[i]) {
+                board[i] = player;
+                let score = minimax(board, depth + 1, false, player);
+                board[i] = null;
+                bestScore = Math.max(score, bestScore);
+            }
+        }
+        return bestScore;
+    } else {
+        let bestScore = Infinity;
+        for (let i = 0; i < 9; i++) {
+            if (!board[i]) {
+                board[i] = opponent;
+                let score = minimax(board, depth + 1, true, player);
+                board[i] = null;
+                bestScore = Math.min(score, bestScore);
+            }
+        }
+        return bestScore;
+    }
 }
 
 function checkWin() {
@@ -258,4 +291,59 @@ function resetGame() {
     movesO = [];
     winnerMessage.textContent = "";
     renderBoard();
+}
+
+function startGame(mode) {
+    gameMode = mode;
+    document.getElementById("menu").style.display = "none";
+    if (mode === "bot") {
+        document.getElementById("difficultyMenu").style.display = "block";
+    } else {
+        document.getElementById("game").style.display = "block";
+        resetGame();
+    }
+}
+
+function setDifficulty(level) {
+    difficulty = level;
+    document.getElementById("difficultyMenu").style.display = "none";
+    document.getElementById("game").style.display = "block";
+    resetGame();
+}
+
+function returnToMenu() {
+    document.getElementById("game").style.display = "none";
+    document.getElementById("difficultyMenu").style.display = "none";
+    document.getElementById("menu").style.display = "block";
+}
+
+function renderBoard(winningPattern = []) {
+    gameBoard.innerHTML = "";
+    board.forEach((cell, index) => {
+        const cellElement = document.createElement("div");
+        cellElement.classList.add("cell");
+
+        if (cell === "X") {
+            cellElement.classList.add("x");
+            cellElement.textContent = "X";
+        } else if (cell === "O") {
+            cellElement.classList.add("o");
+            cellElement.textContent = "O";
+        }
+
+        // Añadir la clase de parpadeo a la figura "X" que se va a eliminar
+        if (currentPlayer === "X" && movesX[0] === index) {
+            cellElement.classList.add("to-remove");
+        } else if (currentPlayer === "O" && movesO[0] === index) {
+            cellElement.classList.add("to-remove");
+        }
+
+        // Resaltar las celdas de la línea ganadora
+        if (winningPattern.includes(index)) {
+            cellElement.classList.add("winner");
+        }
+
+        cellElement.addEventListener("click", () => handleClick(index));
+        gameBoard.appendChild(cellElement);
+    });
 }
